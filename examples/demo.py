@@ -17,17 +17,18 @@
 #
 
 import time
+
 from mercury.platform import Platform
 from mercury.system.models import EventEnvelope
 from mercury.system.po import PostOffice
 
 
 class Hi:
+    MY_NAME = 'Hi'
 
-    @staticmethod
-    def hello(headers: dict, body: any):
+    def hello(self, headers: dict, body: any):
         # singleton function signature (headers: dict, body: any)
-        Platform().log.info(str(headers) + ", " + str(body))
+        Platform().log.info(self.MY_NAME+" "+str(headers) + ", " + str(body))
         return body
 
 
@@ -82,7 +83,7 @@ def main():
     # connect to the network
     platform.connect_to_cloud()
     # wait until connected
-    while not platform.is_cloud_connected():
+    while not platform.cloud_ready():
         try:
             time.sleep(0.1)
         except KeyboardInterrupt:
@@ -90,9 +91,12 @@ def main():
             platform.stop()
             return
 
-    # Demonstrate broadcast feature:
+    # Demonstrate broadcast feature
     # the event will be broadcast to multiple application instances that serve the same route
     po.broadcast("hello.world.1", body="this is a broadcast message from "+platform.get_origin())
+
+    # demonstrate deferred delivery
+    po.send_later('hello.world.1', headers={'hello': 'world'}, body='this message arrives 5 seconds later', seconds=5.0)
 
     #
     # this will keep the main thread running in the background
