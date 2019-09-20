@@ -31,7 +31,13 @@ class AppConfig:
     # comma separated URLs
     #
     NETWORK_CONNECTOR = 'ws://127.0.0.1:8090/ws/lang'
-    API_KEY = 'cb21eba8-3dcd-4553-8ef6-165256be5b4b'
+    #
+    # By default, API key location points to environment variable "LANG_API_KEY".
+    #
+    # If this environment variable is not available, a random API key will be deposited in the temp file system,
+    # assuming that the language connector serves the language pack as a "sidecar".
+    #
+    API_KEY_LOCATION = 'LANG_API_KEY'
     #
     # temporary work directory
     # (for cloud native apps, local file system must be considered transient)
@@ -51,4 +57,15 @@ class AppConfig:
     #
     # Max number of threads for ThreadPoolExecutor
     #
-    MAX_THREADS = 200
+    MAX_THREADS = 250
+
+    #
+    # Optional user defined "distributed trace processor"
+    #
+    # If this named service is available anywhere in the system, we will forward
+    # all distributed tracing information to it so that you may save it to a database
+    # or search engine for visualization in a UI. Alternatively, you may also reformat
+    # the tracing information and forward them to an external distributed tracing server
+    # for centralized processing.
+    #
+    DISTRIBUTED_TRACE_PROCESSOR = 'distributed.trace.processor'

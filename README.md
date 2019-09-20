@@ -31,12 +31,9 @@ If you have your own preference of a different event stream system, you can foll
 
 Hope you enjoy this journey to improve the world.
 
-Best regards, the Mercury team
+Best regards, the Mercury team, Accenture
 
-June 2019
-
-p.s. This project is originated from the "platformlambda project" and contributed by Accenture.
-
+August 2019
 
 ## Rationale
 
@@ -100,7 +97,7 @@ You may then register your microservices like this:
 `platform.register(route: str, user_function: any, total_instances: int, is_private: bool = False)`
 
 ```python
-from microservices.platform import Platform
+from mercury.platform import Platform
 
 def hello(headers: dict, body: any, instance: int):
     # business logic here
@@ -127,6 +124,9 @@ You may make a RPC service call like this. Note that everything is non-blocking 
 RPC uses a temporary inbox service to simulate a synchronous request-response.
 
 ```python
+from mercury.platform import Platform
+from mercury.system.po import PostOffice
+
 #
 # The signature of the request method is:
 #    request(self, route: str, timeout_seconds: float,
@@ -206,6 +206,18 @@ pip install --ignore-installed git+https://github.com/Accenture/mercury-python.g
 ## python3 version
 
 Mercury requires python 3.6.7 or above
+
+## Distributed tracing
+
+Microservices are likely to be deployed in a multi-tier environment. 
+As a result, a single transaction would pass through multiple layers of services.
+
+Distributed tracing allows us to visualize the complete service path for each transaction.
+This enables easy trouble shooting for large scale applications.
+
+With the Mercury framework, distributed tracing does not require coding at application level.
+To enable this feature, you can simply set "tracing=true" in the rest.yaml configuration of
+the rest-automation helper application.
 
 ## Developer guide
 

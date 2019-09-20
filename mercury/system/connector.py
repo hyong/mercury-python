@@ -17,11 +17,14 @@
 #
 
 import io
+import uuid
+import os
 import time
 import asyncio
 import aiohttp
 import msgpack
 
+from mercury.resources.constants import AppConfig
 from mercury.system.models import EventEnvelope
 from mercury.system.utility import Utility
 from mercury.system.cache import SimpleCache
@@ -36,11 +39,12 @@ class NetworkConnector:
     SYSTEM_ALERT = "system.alerts"
     SERVER_CONFIG = "system.config"
     MAX_PAYLOAD = "max.payload"
+    DISTRIBUTED_TRACING = "distributed.tracing"
 
-    def __init__(self, platform, loop, api_key, url_list, origin):
+    def __init__(self, platform, distributed_trace, loop, url_list, origin):
         self.platform = platform
+        self._distributed_trace = distributed_trace
         self._loop = loop
-        self.api_key = api_key
         self.log = platform.log
         self.normal = True
         self.started = False
@@ -55,6 +59,29 @@ class NetworkConnector:
         self.next_url = 1
         self.origin = origin
         self.cache = SimpleCache(loop, self.log, timeout_seconds=30)
+        self.api_key = self._get_api_key()
+
+    def _get_api_key(self):
+        config = AppConfig()
+        if config.API_KEY_LOCATION in os.environ:
+            self.log.info('Found API key in environment variable ' + config.API_KEY_LOCATION)
+            return os.environ[config.API_KEY_LOCATION]
+        # check temp file system because API key not in environment
+        temp_dir = '/tmp/config'
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        api_key_file = temp_dir+"/lang-api-key.txt"
+        if os.path.exists(api_key_file):
+            with open(api_key_file) as f:
+                self.log.info('Reading API key from '+api_key_file)
+                return f.read().strip()
+        else:
+            with open(api_key_file, 'w') as f:
+                self.log.info('Generating new API key in '+api_key_file +
+                              ' because it is not found in environment variable ' + config.API_KEY_LOCATION)
+                value = ''.join(str(uuid.uuid4()).split('-'))
+                f.write(value + '\n')
+                return value
 
     def _get_next_url(self):
         # index starts from 1
@@ -102,7 +129,7 @@ class NetworkConnector:
             envelope.set_to(self.OUTGOING_WS_PATH).set_header('type', 'bytes').set_body(payload)
             self.platform.send_event(envelope)
 
-    def get_server_config(self, headers: dict, body: any):
+    def _get_server_config(self, headers: dict, body: any):
         if 'type' in headers:
             # at this point, login is successful
             if headers['type'] == 'system.config' and isinstance(body, dict):
@@ -124,14 +151,14 @@ class NetworkConnector:
                     event.set_to('pub.sub.sync').set_header('type', 'subscription_sync')
                     self.platform.send_event(event)
 
-    def alert(self, headers: dict, body: any):
+    def _alert(self, headers: dict, body: any):
         if 'status' in headers:
             if headers['status'] == '200':
                 self.log.info(str(body))
             else:
                 self.log.warn(str(body)+", status="+headers['status'])
 
-    def incoming(self, headers: dict, body: any):
+    def _incoming(self, headers: dict, body: any):
         """
         This function handles incoming messages from the websocket connection with the Mercury language connector.
         It must be invoked using events. It should not be called directly to guarantee proper event sequencing.
@@ -183,7 +210,7 @@ class NetworkConnector:
                         else:
                             self.log.warn('Incoming event dropped because '+str(inner_event.get_to())+' not found')
 
-    def outgoing(self, headers: dict, body: any):
+    def _outgoing(self, headers: dict, body: any):
         """
         This function handles sending outgoing messages to the websocket connection with the Mercury language connector.
         It must be invoked using events. It should not be called directly to guarantee proper event sequencing.
@@ -239,10 +266,11 @@ class NetworkConnector:
                     break
         if not self.started:
             self.started = True
-            self.platform.register(self.INCOMING_WS_PATH, self.incoming, 1, is_private=True)
-            self.platform.register(self.OUTGOING_WS_PATH, self.outgoing, 1, is_private=True)
-            self.platform.register(self.SYSTEM_ALERT, self.alert, 1, is_private=True)
-            self.platform.register(self.SERVER_CONFIG, self.get_server_config, 1, is_private=True)
+            self.platform.register(self.DISTRIBUTED_TRACING, self._distributed_trace.logger, 1, is_private=True)
+            self.platform.register(self.INCOMING_WS_PATH, self._incoming, 1, is_private=True)
+            self.platform.register(self.OUTGOING_WS_PATH, self._outgoing, 1, is_private=True)
+            self.platform.register(self.SYSTEM_ALERT, self._alert, 1, is_private=True)
+            self.platform.register(self.SERVER_CONFIG, self._get_server_config, 1, is_private=True)
             self._loop.create_task(worker())
 
     def close_connection(self, code, reason, stop_engine=False):

@@ -50,7 +50,7 @@ def main():
     platform.register('hello.world.2', hello, 10)
 
     po = PostOffice()
-    # send asynchronously. Note that key-values in the headers will be encoded as str
+    # demonstrate sending asynchronously. Note that key-values in the headers will be encoded as strings
     po.send('hello.world.1', headers={'one': 1}, body='hello world one')
     po.send('hello.world.2', headers={'two': 2}, body='hello world two')
 
@@ -106,5 +106,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
